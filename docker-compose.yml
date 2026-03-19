@@ -1,0 +1,66 @@
+services:
+    neo4j-service:
+        image: neo4j:latest
+        container_name: databank-neo4j
+        volumes:
+            - databank_neo4j_data:/data
+            - databank_neo4j_logs:/logs
+            - databank_neo4j_plugins:/plugins
+        environment:
+            - NEO4J_AUTH=neo4j/password1234
+            - NEO4J_dbms_connector_bolt_listen__address=0.0.0.0:7687
+            - NEO4J_dbms_connector_http_listen__address=0.0.0.0:7474
+        ports:
+            - "7474:7474"
+            - "7687:7687"
+        restart: always
+        networks:
+            - app-network
+
+    mongodb-service:
+        image: mongodb/mongodb-community-server:latest
+        container_name: databank-mongodb
+        restart: unless-stopped
+        ports:
+            - "38130:27017"
+        volumes:
+            - databank_mongodb:/data/db 
+        networks:
+            - app-network
+        command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+        healthcheck:
+            test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'databank-mongodb:27017'}]}) }" | mongosh
+            interval: 5s
+            timeout: 5s
+            start_period: 30s
+            retries: 30
+
+
+    backend-data-bank-service:
+    # mongosh --host localhost --port 27017 --db your_database_name
+    # show dbs
+    # use db
+        build: ./backend-data-bank
+        container_name: backend-data-bank
+        restart: unless-stopped
+        ports:
+            - "5000:5000"   
+        env_file:
+            - ./backend-data-bank/.env
+        depends_on:
+            mongodb-service:
+                condition: service_healthy
+            neo4j-service:
+                condition: service_started
+        networks:
+            - app-network
+
+volumes:
+    databank_mongodb:
+    databank_neo4j_data:
+    databank_neo4j_logs:
+    databank_neo4j_plugins:
+
+networks:
+  app-network:
+    driver: bridge

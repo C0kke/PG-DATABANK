@@ -1,0 +1,50 @@
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Get,
+  Request,
+  Logger,
+} from '@nestjs/common';
+import { AuthUserPayloadDto, AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { LoginDto, RegisterDto } from './dto/auth.dto';
+
+@Controller('auth')
+export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+  constructor(private authService: AuthService) {}
+
+  @Post('register')
+  async register(@Body() registerDto: RegisterDto) {
+    this.logger.log(`Registration request received for: ${registerDto.email}`);
+    // before it was return this.authService.register(registerDto.email, registerDto.password);
+    return this.authService.register(registerDto);
+  }
+  @Post('login')
+  async login(@Body() loginDto: LoginDto) {
+    this.logger.log(`Login request received for: ${loginDto.email}`);
+    return this.authService.login(loginDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  getProfile(@Request() req) {
+    this.logger.log(`Profile request from user: ${req.user.email}`);
+    return req.user;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(`logout`)
+  logout(@Request() req: { user: AuthUserPayloadDto }) {
+    this.logger.log(`Logout request from user: ${req.user.email}`);
+    this.authService.logout(req.user);
+    return { message: `Logged out succesfully` }; // messages always return as a object or document data
+  }
+
+  // Use @Request() when you need the full request object.
+  // Use @Body() when you only need the data sent in the request body.
+
+  // If you use @Body() in a GET request, it will usually be empty, since GET requests don’t have a body by HTTP convention.
+}
